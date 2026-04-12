@@ -6,11 +6,12 @@ from fyers_apiv3 import fyersModel
 from fyers_apiv3.fyersModel import SessionModel
 
 # --- 1. CONFIGURATION ---
-CLIENT_ID = "7PHDU5GN1H-100" # अपनी ID डालें
-SECRET_KEY = "8JXSML4ARB" # अपनी Key डालें
-REDIRECT_URI = "https://google.com"
+# Fyers API Dashboard se ye details copy karein
+CLIENT_ID = "7PHDU5GN1H-100"  # Example: XXXXXXX-100
+SECRET_KEY = "8JXSML4ARB"
+REDIRECT_URI = "https://google.com" # Dashboard me bhi yahi honi chahiye
 
-# --- 2. LOGIN LOGIC (Latest v3 Fix) ---
+# --- 2. LOGIN LOGIC (Fixed for 'access_token' error) ---
 def get_fyers_instance():
     if 'access_token' not in st.session_state:
         st.sidebar.header("🔑 Fyers Login")
@@ -22,93 +23,85 @@ def get_fyers_instance():
             grant_type="authorization_code"
         )
         
-        # FIX: बिना अंडरस्कोर वाला फंक्शन
+        # Latest v3 function
         auth_url = session.generate_authcode() 
         
-        st.sidebar.markdown(f"[1. Click Here to Login]({auth_url})")
+        st.sidebar.markdown(f'<a href="{auth_url}" target="_blank" style="padding:10px; background-color:#ED1C24; color:white; border-radius:5px; text-decoration:none;">🚀 Click Here to Login</a>', unsafe_allow_html=True)
         
-        auth_code = st.sidebar.text_input("2. Paste Auth Code from URL:")
+        st.sidebar.info("Login ke baad URL se 'auth_code' copy karein.")
+        auth_code = st.sidebar.text_input("Yahan Auth Code paste karein:")
+        
         if auth_code:
             try:
                 session.set_token(auth_code)
                 response = session.generate_token()
-                st.session_state.access_token = response["access_token"]
-                st.rerun()
+                
+                # 'access_token' key check fix
+                if 'access_token' in response:
+                    st.session_state.access_token = response["access_token"]
+                    st.sidebar.success("Login Successful! ✅")
+                    st.rerun()
+                else:
+                    st.sidebar.error(f"Token Error: {response.get('message', 'Unknown Error')}")
             except Exception as e:
-                st.sidebar.error(f"Login Error: {e}")
+                st.sidebar.error(f"Login Error: {str(e)}")
         return None
+    
     return fyersModel.FyersModel(client_id=CLIENT_ID, token=st.session_state.access_token, log_path="")
 
-# --- 3. HELPERS: SOUND & SYMBOLS ---
-def play_sound():
-    sound_html = """<audio autoplay><source src="https://soundjay.com"></audio>"""
-    st.components.v1.html(sound_html, height=0)
-
+# --- 3. OHL SCANNER ENGINE ---
 def get_opt_sym(stock, ltp, type="CE"):
-    expiry = "24MAY" # Weekly अपडेट करें
+    expiry = "24MAY" # Update weekly
     strike = round(ltp / 100) * 100 if "NIFTY" in stock else round(ltp / 10) * 10
     base = stock.replace("NSE:", "").replace("-EQ", "").replace("-INDEX", "")
     return f"NSE:{base}{expiry}{int(strike)}{type}"
 
-# --- 4. MAIN DASHBOARD ---
+# --- 4. DASHBOARD UI ---
 st.set_page_config(layout="wide", page_title="OHL Pro Scanner")
-st.title("⚡ Live OHL & Breakout Dashboard")
+st.title("📊 Live OHL & Options Dashboard")
 
 fyers = get_fyers_instance()
 
 if fyers:
-    st.sidebar.success("✅ Connected")
-    # Stocks List
     watch_stocks = ["NSE:SBIN-EQ", "NSE:NIFTY50-INDEX", "NSE:BANKNIFTY-INDEX", "NSE:RELIANCE-EQ"]
-    
-    col1, col2, col3 = st.columns([1, 1, 2]) # Dashboard Layout
+    col1, col2 = st.columns([1, 2]) # List | Chart
 
     results = []
-    alerts = []
     today = datetime.date.today().strftime('%Y-%m-%d')
 
-    for s in watch_stocks:
-        try:
-            q_res = fyers.quotes({"symbols": s})
-            q = q_res['d'][0]['v']['lp'] # Fix for dict response
-            all_syms = [s, get_opt_sym(s, q, "CE"), get_opt_sym(s, q, "PE")]
-
-            for sym in all_syms:
-                res = fyers.history(data={"symbol": sym, "resolution": "15", "date_format": "1", "range_from": today, "range_to": today, "cont_flag": "1"})
-                if res['s'] == 'ok' and len(res['candles']) > 0:
-                    df = pd.DataFrame(res['candles'], columns=['T','O','H','L','C','V'])
-                    o, h_max, l_min, ltp = df.iloc[0]['O'], df['H'].max(), df['L'].min(), df.iloc[-1]['C']
-                    
-                    status = "Normal"
-                    if o == l_min: 
-                        status = "🚀 Bull (O=L)"
-                        if ltp >= h_max * 0.998: alerts.append(f"🔥 BUY: {sym}")
-                    elif o == h_max: 
-                        status = "🔻 Bear (O=H)"
-                        if ltp <= l_min * 1.002: alerts.append(f"🧊 SELL: {sym}")
-                    
-                    change = round(((ltp - o) / o) * 100, 2)
-                    results.append({"Symbol": sym, "Signal": status, "LTP": ltp, "% Chg": change})
-        except: continue
+    with st.spinner("Scanning Market..."):
+        for s in watch_stocks:
+            try:
+                q_res = fyers.quotes({"symbols": s})
+                q = q_res['d'][0]['v']['lp'] # Corrected response path
+                
+                symbols = [s, get_opt_sym(s, q, "CE"), get_opt_sym(s, q, "PE")]
+                
+                for sym in symbols:
+                    res = fyers.history(data={"symbol": sym, "resolution": "15", "date_format": "1", "range_from": today, "range_to": today, "cont_flag": "1"})
+                    if res['s'] == 'ok' and len(res['candles']) > 0:
+                        df = pd.DataFrame(res['candles'], columns=['T','O','H','L','C','V'])
+                        o, h_max, l_min, ltp = df.iloc[0]['O'], df['H'].max(), df['L'].min(), df.iloc[-1]['C']
+                        
+                        signal = "Neutral"
+                        if o == l_min: signal = "🚀 O=L (Bull)"
+                        elif o == h_max: signal = "🔻 O=H (Bear)"
+                        
+                        change = round(((ltp - o) / o) * 100, 2)
+                        results.append({"Symbol": sym, "Signal": signal, "LTP": ltp, "% Chg": change})
+            except: continue
 
     with col1:
-        st.subheader("📋 Scanner List")
+        st.subheader("📋 Signals")
         if results:
             df_res = pd.DataFrame(results)
-            selected = st.radio("Select for Chart:", df_res['Symbol'].tolist())
-            st.dataframe(df_res, use_container_width=True)
-        if st.button("Refresh 🔄"): st.rerun()
+            selected = st.selectbox("Select for Chart:", df_res['Symbol'].tolist())
+            st.dataframe(df_res.style.applymap(lambda x: 'color: green' if 'Bull' in str(x) else ('color: red' if 'Bear' in str(x) else ''), subset=['Signal']))
+        if st.button("🔄 Refresh Data"): st.rerun()
 
     with col2:
-        st.subheader("⚠️ Alerts")
-        if alerts:
-            play_sound()
-            for a in alerts: st.success(a)
-        else: st.info("No breakouts.")
-
-    with col3:
         if 'selected' in locals():
-            st.subheader(f"📊 Chart: {selected}")
+            st.subheader(f"📈 Chart: {selected}")
             c_res = fyers.history(data={"symbol": selected, "resolution": "5", "date_format": "1", "range_from": today, "range_to": today, "cont_flag": "1"})
             if c_res['s'] == 'ok':
                 c_df = pd.DataFrame(c_res['candles'], columns=['T', 'O', 'H', 'L', 'C', 'V'])
@@ -116,4 +109,4 @@ if fyers:
                 fig.update_layout(template="plotly_dark", height=500, margin=dict(l=0,r=0,t=0,b=0))
                 st.plotly_chart(fig, use_container_width=True)
 else:
-    st.info("Sidebar se login karein tabhi dashboard load hoga.")
+    st.warning("Sidebar me 'Click Here to Login' button se start karein.")
