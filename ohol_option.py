@@ -6,8 +6,8 @@ from fyers_apiv3 import fyersModel
 from fyers_apiv3.fyersModel import SessionModel
 
 # --- 1. CONFIGURATION ---
-CLIENT_ID = "YOUR_CLIENT_ID" # अपनी ID डालें
-SECRET_KEY = "YOUR_SECRET_KEY" # अपनी Key डालें
+CLIENT_ID = "7PHDU5GN1H-100" # अपनी ID डालें
+SECRET_KEY = "8JXSML4ARB" # अपनी Key डालें
 REDIRECT_URI = "https://google.com"
 
 # --- 2. LOGIN LOGIC (Latest v3 Fix) ---
