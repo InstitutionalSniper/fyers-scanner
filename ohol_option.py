@@ -8,8 +8,8 @@ import datetime
 
 # --- 1. CONFIGURATION ---
 # Apni details yahan bharein
-CLIENT_ID = "YOUR_CLIENT_ID" 
-SECRET_KEY = "YOUR_SECRET_KEY"
+CLIENT_ID = "OL2VOH980F-100" 
+SECRET_KEY = "V3VIK5OGRB"
 REDIRECT_URI = "https://google.com"
 
 # --- 2. LOGIN LOGIC (Fixed for v3) ---
