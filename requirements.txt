@@ -1,4 +1,0 @@
-fyers-apiv3
-streamlit
-pandas
-plotly
